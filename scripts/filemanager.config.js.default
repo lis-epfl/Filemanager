@@ -4,7 +4,7 @@
         "culture": "en",
         "lang": "php",
         "theme": "flat-dark",
-        "defaultViewMode": "grid",
+        "defaultViewMode": "list",
         "autoload": true,
         "showFullPath": false,
         "showTitleAttr": false,
@@ -18,10 +18,10 @@
         "chars_only_latin": true,
         "dateFormat": "d M Y H:i",
         "serverRoot": true,
-        "fileRoot": false,
+        "fileRoot": "/",
         "baseUrl": false,
         "logger": false,
-        "capabilities": ["select", "download", "rename", "delete", "replace"],
+        "capabilities": ["select", "download", "rename", "delete", "replace", "move"],
         "plugins": []
     },
     "security": {

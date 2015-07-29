@@ -11,171 +11,6 @@
     var module = { exports: { } }; // Fake component
 
 
-/**
- * Expose `Emitter`.
- */
-
-module.exports = Emitter;
-
-/**
- * Initialize a new `Emitter`.
- *
- * @api public
- */
-
-function Emitter(obj) {
-  if (obj) return mixin(obj);
-};
-
-/**
- * Mixin the emitter properties.
- *
- * @param {Object} obj
- * @return {Object}
- * @api private
- */
-
-function mixin(obj) {
-  for (var key in Emitter.prototype) {
-    obj[key] = Emitter.prototype[key];
-  }
-  return obj;
-}
-
-/**
- * Listen on the given `event` with `fn`.
- *
- * @param {String} event
- * @param {Function} fn
- * @return {Emitter}
- * @api public
- */
-
-Emitter.prototype.on =
-Emitter.prototype.addEventListener = function(event, fn){
-  this._callbacks = this._callbacks || {};
-  (this._callbacks[event] = this._callbacks[event] || [])
-    .push(fn);
-  return this;
-};
-
-/**
- * Adds an `event` listener that will be invoked a single
- * time then automatically removed.
- *
- * @param {String} event
- * @param {Function} fn
- * @return {Emitter}
- * @api public
- */
-
-Emitter.prototype.once = function(event, fn){
-  var self = this;
-  this._callbacks = this._callbacks || {};
-
-  function on() {
-    self.off(event, on);
-    fn.apply(this, arguments);
-  }
-
-  on.fn = fn;
-  this.on(event, on);
-  return this;
-};
-
-/**
- * Remove the given callback for `event` or all
- * registered callbacks.
- *
- * @param {String} event
- * @param {Function} fn
- * @return {Emitter}
- * @api public
- */
-
-Emitter.prototype.off =
-Emitter.prototype.removeListener =
-Emitter.prototype.removeAllListeners =
-Emitter.prototype.removeEventListener = function(event, fn){
-  this._callbacks = this._callbacks || {};
-
-  // all
-  if (0 == arguments.length) {
-    this._callbacks = {};
-    return this;
-  }
-
-  // specific event
-  var callbacks = this._callbacks[event];
-  if (!callbacks) return this;
-
-  // remove all handlers
-  if (1 == arguments.length) {
-    delete this._callbacks[event];
-    return this;
-  }
-
-  // remove specific handler
-  var cb;
-  for (var i = 0; i < callbacks.length; i++) {
-    cb = callbacks[i];
-    if (cb === fn || cb.fn === fn) {
-      callbacks.splice(i, 1);
-      break;
-    }
-  }
-  return this;
-};
-
-/**
- * Emit `event` with the given args.
- *
- * @param {String} event
- * @param {Mixed} ...
- * @return {Emitter}
- */
-
-Emitter.prototype.emit = function(event){
-  this._callbacks = this._callbacks || {};
-  var args = [].slice.call(arguments, 1)
-    , callbacks = this._callbacks[event];
-
-  if (callbacks) {
-    callbacks = callbacks.slice(0);
-    for (var i = 0, len = callbacks.length; i < len; ++i) {
-      callbacks[i].apply(this, args);
-    }
-  }
-
-  return this;
-};
-
-/**
- * Return array of callbacks for `event`.
- *
- * @param {String} event
- * @return {Array}
- * @api public
- */
-
-Emitter.prototype.listeners = function(event){
-  this._callbacks = this._callbacks || {};
-  return this._callbacks[event] || [];
-};
-
-/**
- * Check if this emitter has `event` handlers.
- *
- * @param {String} event
- * @return {Boolean}
- * @api public
- */
-
-Emitter.prototype.hasListeners = function(event){
-  return !! this.listeners(event).length;
-};
-
-
 /*
  *
  * More info at [www.dropzonejs.com](http://www.dropzonejs.com)
@@ -1279,10 +1114,62 @@ Emitter.prototype.hasListeners = function(event){
     };
 
     Dropzone.prototype.uploadFiles = function(files) {
-      var file, formData, handleError, headerName, headerValue, headers, i, input, inputName, inputType, key, option, progressObj, response, updateProgress, value, xhr, _i, _j, _k, _l, _len, _len1, _len2, _len3, _m, _ref, _ref1, _ref2, _ref3, _ref4, _ref5;
-      xhr = new XMLHttpRequest();
+      var file, formData, handleError, headerName, headerValue, headers, i, input, inputName, inputType, key, option, progressObj, reader, response, updateProgress, value, xhr, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _m, _n, _o, _ref, _ref1, _ref2, _ref3, _ref4, _ref5;
+      formData = {};
       for (_i = 0, _len = files.length; _i < _len; _i++) {
         file = files[_i];
+        this.emit("sending", file, reader, formData);
+      }
+      for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
+        file = files[_j];
+        reader = new FileReader();
+        reader.addEventListener("progress", (function(_this) {
+          return function(e) {
+            var progress;
+            progress = 100 * e.loaded / e.total;
+            file.upload = {
+              progress: progress,
+              total: e.total,
+              bytesSent: e.loaded
+            };
+            return _this.emit("uploadprogress", file, progress, file.upload.bytesSent);
+          };
+        })(this));
+        reader.addEventListener("load", (function(_this) {
+          return function(e) {
+            var allDone, dataArray, f, filename, _k, _len2;
+            filename = formData.currentpath + file.name;
+            dataArray = new Uint8Array(reader.result);
+            FS.writeFile(filename, dataArray, {
+              encoding: "binary"
+            });
+            file.upload.done = true;
+            allDone = true;
+            for (_k = 0, _len2 = files.length; _k < _len2; _k++) {
+              f = files[_k];
+              if (!f.upload.done) {
+                allDone = false;
+              }
+            }
+            if (allDone) {
+              return Connector.sync(function() {
+                console.log("upload done");
+                return _this._finished(files, {
+                  Error: "No Error",
+                  Code: 0,
+                  Path: formData.currentpath,
+                  Name: file.name
+                }, e);
+              });
+            }
+          };
+        })(this));
+        reader.readAsArrayBuffer(file);
+      }
+      return;
+      xhr = new XMLHttpRequest();
+      for (_k = 0, _len2 = files.length; _k < _len2; _k++) {
+        file = files[_k];
         file.xhr = xhr;
       }
       xhr.open(this.options.method, this.options.url, true);
@@ -1290,10 +1177,10 @@ Emitter.prototype.hasListeners = function(event){
       response = null;
       handleError = (function(_this) {
         return function() {
-          var _j, _len1, _results;
+          var _l, _len3, _results;
           _results = [];
-          for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
-            file = files[_j];
+          for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
+            file = files[_l];
             _results.push(_this._errorProcessing(files, response || _this.options.dictResponseError.replace("{{statusCode}}", xhr.status), xhr));
           }
           return _results;
@@ -1301,11 +1188,11 @@ Emitter.prototype.hasListeners = function(event){
       })(this);
       updateProgress = (function(_this) {
         return function(e) {
-          var allFilesFinished, progress, _j, _k, _l, _len1, _len2, _len3, _results;
+          var allFilesFinished, progress, _l, _len3, _len4, _len5, _m, _n, _results;
           if (e != null) {
             progress = 100 * e.loaded / e.total;
-            for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
-              file = files[_j];
+            for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
+              file = files[_l];
               file.upload = {
                 progress: progress,
                 total: e.total,
@@ -1315,8 +1202,8 @@ Emitter.prototype.hasListeners = function(event){
           } else {
             allFilesFinished = true;
             progress = 100;
-            for (_k = 0, _len2 = files.length; _k < _len2; _k++) {
-              file = files[_k];
+            for (_m = 0, _len4 = files.length; _m < _len4; _m++) {
+              file = files[_m];
               if (!(file.upload.progress === 100 && file.upload.bytesSent === file.upload.total)) {
                 allFilesFinished = false;
               }
@@ -1328,8 +1215,8 @@ Emitter.prototype.hasListeners = function(event){
             }
           }
           _results = [];
-          for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
-            file = files[_l];
+          for (_n = 0, _len5 = files.length; _n < _len5; _n++) {
+            file = files[_n];
             _results.push(_this.emit("uploadprogress", file, progress, file.upload.bytesSent));
           }
           return _results;
@@ -1391,8 +1278,8 @@ Emitter.prototype.hasListeners = function(event){
           formData.append(key, value);
         }
       }
-      for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
-        file = files[_j];
+      for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
+        file = files[_l];
         this.emit("sending", file, xhr, formData);
       }
       if (this.options.uploadMultiple) {
@@ -1400,14 +1287,14 @@ Emitter.prototype.hasListeners = function(event){
       }
       if (this.element.tagName === "FORM") {
         _ref2 = this.element.querySelectorAll("input, textarea, select, button");
-        for (_k = 0, _len2 = _ref2.length; _k < _len2; _k++) {
-          input = _ref2[_k];
+        for (_m = 0, _len4 = _ref2.length; _m < _len4; _m++) {
+          input = _ref2[_m];
           inputName = input.getAttribute("name");
           inputType = input.getAttribute("type");
           if (input.tagName === "SELECT" && input.hasAttribute("multiple")) {
             _ref3 = input.options;
-            for (_l = 0, _len3 = _ref3.length; _l < _len3; _l++) {
-              option = _ref3[_l];
+            for (_n = 0, _len5 = _ref3.length; _n < _len5; _n++) {
+              option = _ref3[_n];
               if (option.selected) {
                 formData.append(inputName, option.value);
               }
@@ -1417,7 +1304,7 @@ Emitter.prototype.hasListeners = function(event){
           }
         }
       }
-      for (i = _m = 0, _ref5 = files.length - 1; 0 <= _ref5 ? _m <= _ref5 : _m >= _ref5; i = 0 <= _ref5 ? ++_m : --_m) {
+      for (i = _o = 0, _ref5 = files.length - 1; 0 <= _ref5 ? _o <= _ref5 : _o >= _ref5; i = 0 <= _ref5 ? ++_o : --_o) {
         formData.append(this._getParamName(i), files[i], files[i].name);
       }
       return xhr.send(formData);

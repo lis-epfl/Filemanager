@@ -1102,10 +1102,62 @@
     };
 
     Dropzone.prototype.uploadFiles = function(files) {
-      var file, formData, handleError, headerName, headerValue, headers, i, input, inputName, inputType, key, option, progressObj, response, updateProgress, value, xhr, _i, _j, _k, _l, _len, _len1, _len2, _len3, _m, _ref, _ref1, _ref2, _ref3, _ref4, _ref5;
-      xhr = new XMLHttpRequest();
+      var file, formData, handleError, headerName, headerValue, headers, i, input, inputName, inputType, key, option, progressObj, reader, response, updateProgress, value, xhr, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _m, _n, _o, _ref, _ref1, _ref2, _ref3, _ref4, _ref5;
+      formData = {};
       for (_i = 0, _len = files.length; _i < _len; _i++) {
         file = files[_i];
+        this.emit("sending", file, reader, formData);
+      }
+      for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
+        file = files[_j];
+        reader = new FileReader();
+        reader.addEventListener("progress", (function(_this) {
+          return function(e) {
+            var progress;
+            progress = 100 * e.loaded / e.total;
+            file.upload = {
+              progress: progress,
+              total: e.total,
+              bytesSent: e.loaded
+            };
+            return _this.emit("uploadprogress", file, progress, file.upload.bytesSent);
+          };
+        })(this));
+        reader.addEventListener("load", (function(_this) {
+          return function(e) {
+            var allDone, dataArray, f, filename, _k, _len2;
+            filename = formData.currentpath + file.name;
+            dataArray = new Uint8Array(reader.result);
+            FS.writeFile(filename, dataArray, {
+              encoding: "binary"
+            });
+            file.upload.done = true;
+            allDone = true;
+            for (_k = 0, _len2 = files.length; _k < _len2; _k++) {
+              f = files[_k];
+              if (!f.upload.done) {
+                allDone = false;
+              }
+            }
+            if (allDone) {
+              return Connector.sync(function() {
+                console.log("upload done");
+                return _this._finished(files, {
+                  Error: "No Error",
+                  Code: 0,
+                  Path: formData.currentpath,
+                  Name: file.name
+                }, e);
+              });
+            }
+          };
+        })(this));
+        reader.readAsArrayBuffer(file);
+      }
+      return;
+      xhr = new XMLHttpRequest();
+      for (_k = 0, _len2 = files.length; _k < _len2; _k++) {
+        file = files[_k];
         file.xhr = xhr;
       }
       xhr.open(this.options.method, this.options.url, true);
@@ -1113,10 +1165,10 @@
       response = null;
       handleError = (function(_this) {
         return function() {
-          var _j, _len1, _results;
+          var _l, _len3, _results;
           _results = [];
-          for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
-            file = files[_j];
+          for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
+            file = files[_l];
             _results.push(_this._errorProcessing(files, response || _this.options.dictResponseError.replace("{{statusCode}}", xhr.status), xhr));
           }
           return _results;
@@ -1124,11 +1176,11 @@
       })(this);
       updateProgress = (function(_this) {
         return function(e) {
-          var allFilesFinished, progress, _j, _k, _l, _len1, _len2, _len3, _results;
+          var allFilesFinished, progress, _l, _len3, _len4, _len5, _m, _n, _results;
           if (e != null) {
             progress = 100 * e.loaded / e.total;
-            for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
-              file = files[_j];
+            for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
+              file = files[_l];
               file.upload = {
                 progress: progress,
                 total: e.total,
@@ -1138,8 +1190,8 @@
           } else {
             allFilesFinished = true;
             progress = 100;
-            for (_k = 0, _len2 = files.length; _k < _len2; _k++) {
-              file = files[_k];
+            for (_m = 0, _len4 = files.length; _m < _len4; _m++) {
+              file = files[_m];
               if (!(file.upload.progress === 100 && file.upload.bytesSent === file.upload.total)) {
                 allFilesFinished = false;
               }
@@ -1151,8 +1203,8 @@
             }
           }
           _results = [];
-          for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
-            file = files[_l];
+          for (_n = 0, _len5 = files.length; _n < _len5; _n++) {
+            file = files[_n];
             _results.push(_this.emit("uploadprogress", file, progress, file.upload.bytesSent));
           }
           return _results;
@@ -1214,8 +1266,8 @@
           formData.append(key, value);
         }
       }
-      for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
-        file = files[_j];
+      for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
+        file = files[_l];
         this.emit("sending", file, xhr, formData);
       }
       if (this.options.uploadMultiple) {
@@ -1223,14 +1275,14 @@
       }
       if (this.element.tagName === "FORM") {
         _ref2 = this.element.querySelectorAll("input, textarea, select, button");
-        for (_k = 0, _len2 = _ref2.length; _k < _len2; _k++) {
-          input = _ref2[_k];
+        for (_m = 0, _len4 = _ref2.length; _m < _len4; _m++) {
+          input = _ref2[_m];
           inputName = input.getAttribute("name");
           inputType = input.getAttribute("type");
           if (input.tagName === "SELECT" && input.hasAttribute("multiple")) {
             _ref3 = input.options;
-            for (_l = 0, _len3 = _ref3.length; _l < _len3; _l++) {
-              option = _ref3[_l];
+            for (_n = 0, _len5 = _ref3.length; _n < _len5; _n++) {
+              option = _ref3[_n];
               if (option.selected) {
                 formData.append(inputName, option.value);
               }
@@ -1240,7 +1292,7 @@
           }
         }
       }
-      for (i = _m = 0, _ref5 = files.length - 1; 0 <= _ref5 ? _m <= _ref5 : _m >= _ref5; i = 0 <= _ref5 ? ++_m : --_m) {
+      for (i = _o = 0, _ref5 = files.length - 1; 0 <= _ref5 ? _o <= _ref5 : _o >= _ref5; i = 0 <= _ref5 ? ++_o : --_o) {
         formData.append(this._getParamName(i), files[i], files[i].name);
       }
       return xhr.send(formData);

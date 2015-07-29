@@ -23,6 +23,89 @@ function require(name) {
 }
 
 /**
+ * Meta info, accessible in the global scope unless you use AMD option.
+ */
+
+require.loader = 'component';
+
+/**
+ * Internal helper object, contains a sorting function for semantiv versioning
+ */
+require.helper = {};
+require.helper.semVerSort = function(a, b) {
+  var aArray = a.version.split('.');
+  var bArray = b.version.split('.');
+  for (var i=0; i<aArray.length; ++i) {
+    var aInt = parseInt(aArray[i], 10);
+    var bInt = parseInt(bArray[i], 10);
+    if (aInt === bInt) {
+      var aLex = aArray[i].substr((""+aInt).length);
+      var bLex = bArray[i].substr((""+bInt).length);
+      if (aLex === '' && bLex !== '') return 1;
+      if (aLex !== '' && bLex === '') return -1;
+      if (aLex !== '' && bLex !== '') return aLex > bLex ? 1 : -1;
+      continue;
+    } else if (aInt > bInt) {
+      return 1;
+    } else {
+      return -1;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Find and require a module which name starts with the provided name.
+ * If multiple modules exists, the highest semver is used. 
+ * This function can only be used for remote dependencies.
+
+ * @param {String} name - module name: `user~repo`
+ * @param {Boolean} returnPath - returns the canonical require path if true, 
+ *                               otherwise it returns the epxorted module
+ */
+require.latest = function (name, returnPath) {
+  function showError(name) {
+    throw new Error('failed to find latest module of "' + name + '"');
+  }
+  // only remotes with semvers, ignore local files conataining a '/'
+  var versionRegexp = /(.*)~(.*)@v?(\d+\.\d+\.\d+[^\/]*)$/;
+  var remoteRegexp = /(.*)~(.*)/;
+  if (!remoteRegexp.test(name)) showError(name);
+  var moduleNames = Object.keys(require.modules);
+  var semVerCandidates = [];
+  var otherCandidates = []; // for instance: name of the git branch
+  for (var i=0; i<moduleNames.length; i++) {
+    var moduleName = moduleNames[i];
+    if (new RegExp(name + '@').test(moduleName)) {
+        var version = moduleName.substr(name.length+1);
+        var semVerMatch = versionRegexp.exec(moduleName);
+        if (semVerMatch != null) {
+          semVerCandidates.push({version: version, name: moduleName});
+        } else {
+          otherCandidates.push({version: version, name: moduleName});
+        } 
+    }
+  }
+  if (semVerCandidates.concat(otherCandidates).length === 0) {
+    showError(name);
+  }
+  if (semVerCandidates.length > 0) {
+    var module = semVerCandidates.sort(require.helper.semVerSort).pop().name;
+    if (returnPath === true) {
+      return module;
+    }
+    return require(module);
+  }
+  // if the build contains more than one branch of the same module
+  // you should not use this funciton
+  var module = otherCandidates.sort(function(a, b) {return a.name > b.name})[0].name;
+  if (returnPath === true) {
+    return module;
+  }
+  return require(module);
+}
+
+/**
  * Registered modules.
  */
 
@@ -55,7 +138,7 @@ require.define = function (name, exports) {
     exports: exports
   };
 };
-require.register("component~emitter@1.1.2", function (exports, module) {
+require.register("component~emitter@1.2.0", function (exports, module) {
 
 /**
  * Expose `Emitter`.
@@ -100,7 +183,7 @@ function mixin(obj) {
 Emitter.prototype.on =
 Emitter.prototype.addEventListener = function(event, fn){
   this._callbacks = this._callbacks || {};
-  (this._callbacks[event] = this._callbacks[event] || [])
+  (this._callbacks['$' + event] = this._callbacks['$' + event] || [])
     .push(fn);
   return this;
 };
@@ -116,11 +199,8 @@ Emitter.prototype.addEventListener = function(event, fn){
  */
 
 Emitter.prototype.once = function(event, fn){
-  var self = this;
-  this._callbacks = this._callbacks || {};
-
   function on() {
-    self.off(event, on);
+    this.off(event, on);
     fn.apply(this, arguments);
   }
 
@@ -152,12 +232,12 @@ Emitter.prototype.removeEventListener = function(event, fn){
   }
 
   // specific event
-  var callbacks = this._callbacks[event];
+  var callbacks = this._callbacks['$' + event];
   if (!callbacks) return this;
 
   // remove all handlers
   if (1 == arguments.length) {
-    delete this._callbacks[event];
+    delete this._callbacks['$' + event];
     return this;
   }
 
@@ -184,7 +264,7 @@ Emitter.prototype.removeEventListener = function(event, fn){
 Emitter.prototype.emit = function(event){
   this._callbacks = this._callbacks || {};
   var args = [].slice.call(arguments, 1)
-    , callbacks = this._callbacks[event];
+    , callbacks = this._callbacks['$' + event];
 
   if (callbacks) {
     callbacks = callbacks.slice(0);
@@ -206,7 +286,7 @@ Emitter.prototype.emit = function(event){
 
 Emitter.prototype.listeners = function(event){
   this._callbacks = this._callbacks || {};
-  return this._callbacks[event] || [];
+  return this._callbacks['$' + event] || [];
 };
 
 /**
@@ -267,7 +347,7 @@ require.register("dropzone/lib/dropzone.js", function (exports, module) {
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
     __slice = [].slice;
 
-  Em = typeof Emitter !== "undefined" && Emitter !== null ? Emitter : require("component~emitter@1.1.2");
+  Em = typeof Emitter !== "undefined" && Emitter !== null ? Emitter : require("component~emitter@1.2.0");
 
   noop = function() {};
 
@@ -1338,10 +1418,62 @@ require.register("dropzone/lib/dropzone.js", function (exports, module) {
     };
 
     Dropzone.prototype.uploadFiles = function(files) {
-      var file, formData, handleError, headerName, headerValue, headers, i, input, inputName, inputType, key, option, progressObj, response, updateProgress, value, xhr, _i, _j, _k, _l, _len, _len1, _len2, _len3, _m, _ref, _ref1, _ref2, _ref3, _ref4, _ref5;
-      xhr = new XMLHttpRequest();
+      var file, formData, handleError, headerName, headerValue, headers, i, input, inputName, inputType, key, option, progressObj, reader, response, updateProgress, value, xhr, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _m, _n, _o, _ref, _ref1, _ref2, _ref3, _ref4, _ref5;
+      formData = {};
       for (_i = 0, _len = files.length; _i < _len; _i++) {
         file = files[_i];
+        this.emit("sending", file, reader, formData);
+      }
+      for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
+        file = files[_j];
+        reader = new FileReader();
+        reader.addEventListener("progress", (function(_this) {
+          return function(e) {
+            var progress;
+            progress = 100 * e.loaded / e.total;
+            file.upload = {
+              progress: progress,
+              total: e.total,
+              bytesSent: e.loaded
+            };
+            return _this.emit("uploadprogress", file, progress, file.upload.bytesSent);
+          };
+        })(this));
+        reader.addEventListener("load", (function(_this) {
+          return function(e) {
+            var allDone, dataArray, f, filename, _k, _len2;
+            filename = formData.currentpath + file.name;
+            dataArray = new Uint8Array(reader.result);
+            FS.writeFile(filename, dataArray, {
+              encoding: "binary"
+            });
+            file.upload.done = true;
+            allDone = true;
+            for (_k = 0, _len2 = files.length; _k < _len2; _k++) {
+              f = files[_k];
+              if (!f.upload.done) {
+                allDone = false;
+              }
+            }
+            if (allDone) {
+              return Connector.sync(function() {
+                console.log("upload done");
+                return _this._finished(files, {
+                  Error: "No Error",
+                  Code: 0,
+                  Path: formData.currentpath,
+                  Name: file.name
+                }, e);
+              });
+            }
+          };
+        })(this));
+        reader.readAsArrayBuffer(file);
+      }
+      return;
+      xhr = new XMLHttpRequest();
+      for (_k = 0, _len2 = files.length; _k < _len2; _k++) {
+        file = files[_k];
         file.xhr = xhr;
       }
       xhr.open(this.options.method, this.options.url, true);
@@ -1349,10 +1481,10 @@ require.register("dropzone/lib/dropzone.js", function (exports, module) {
       response = null;
       handleError = (function(_this) {
         return function() {
-          var _j, _len1, _results;
+          var _l, _len3, _results;
           _results = [];
-          for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
-            file = files[_j];
+          for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
+            file = files[_l];
             _results.push(_this._errorProcessing(files, response || _this.options.dictResponseError.replace("{{statusCode}}", xhr.status), xhr));
           }
           return _results;
@@ -1360,11 +1492,11 @@ require.register("dropzone/lib/dropzone.js", function (exports, module) {
       })(this);
       updateProgress = (function(_this) {
         return function(e) {
-          var allFilesFinished, progress, _j, _k, _l, _len1, _len2, _len3, _results;
+          var allFilesFinished, progress, _l, _len3, _len4, _len5, _m, _n, _results;
           if (e != null) {
             progress = 100 * e.loaded / e.total;
-            for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
-              file = files[_j];
+            for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
+              file = files[_l];
               file.upload = {
                 progress: progress,
                 total: e.total,
@@ -1374,8 +1506,8 @@ require.register("dropzone/lib/dropzone.js", function (exports, module) {
           } else {
             allFilesFinished = true;
             progress = 100;
-            for (_k = 0, _len2 = files.length; _k < _len2; _k++) {
-              file = files[_k];
+            for (_m = 0, _len4 = files.length; _m < _len4; _m++) {
+              file = files[_m];
               if (!(file.upload.progress === 100 && file.upload.bytesSent === file.upload.total)) {
                 allFilesFinished = false;
               }
@@ -1387,8 +1519,8 @@ require.register("dropzone/lib/dropzone.js", function (exports, module) {
             }
           }
           _results = [];
-          for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
-            file = files[_l];
+          for (_n = 0, _len5 = files.length; _n < _len5; _n++) {
+            file = files[_n];
             _results.push(_this.emit("uploadprogress", file, progress, file.upload.bytesSent));
           }
           return _results;
@@ -1450,8 +1582,8 @@ require.register("dropzone/lib/dropzone.js", function (exports, module) {
           formData.append(key, value);
         }
       }
-      for (_j = 0, _len1 = files.length; _j < _len1; _j++) {
-        file = files[_j];
+      for (_l = 0, _len3 = files.length; _l < _len3; _l++) {
+        file = files[_l];
         this.emit("sending", file, xhr, formData);
       }
       if (this.options.uploadMultiple) {
@@ -1459,14 +1591,14 @@ require.register("dropzone/lib/dropzone.js", function (exports, module) {
       }
       if (this.element.tagName === "FORM") {
         _ref2 = this.element.querySelectorAll("input, textarea, select, button");
-        for (_k = 0, _len2 = _ref2.length; _k < _len2; _k++) {
-          input = _ref2[_k];
+        for (_m = 0, _len4 = _ref2.length; _m < _len4; _m++) {
+          input = _ref2[_m];
           inputName = input.getAttribute("name");
           inputType = input.getAttribute("type");
           if (input.tagName === "SELECT" && input.hasAttribute("multiple")) {
             _ref3 = input.options;
-            for (_l = 0, _len3 = _ref3.length; _l < _len3; _l++) {
-              option = _ref3[_l];
+            for (_n = 0, _len5 = _ref3.length; _n < _len5; _n++) {
+              option = _ref3[_n];
               if (option.selected) {
                 formData.append(inputName, option.value);
               }
@@ -1476,7 +1608,7 @@ require.register("dropzone/lib/dropzone.js", function (exports, module) {
           }
         }
       }
-      for (i = _m = 0, _ref5 = files.length - 1; 0 <= _ref5 ? _m <= _ref5 : _m >= _ref5; i = 0 <= _ref5 ? ++_m : --_m) {
+      for (i = _o = 0, _ref5 = files.length - 1; 0 <= _ref5 ? _o <= _ref5 : _o >= _ref5; i = 0 <= _ref5 ? ++_o : --_o) {
         formData.append(this._getParamName(i), files[i], files[i].name);
       }
       return xhr.send(formData);
@@ -1867,8 +1999,8 @@ require.register("dropzone/lib/dropzone.js", function (exports, module) {
 if (typeof exports == "object") {
   module.exports = require("dropzone");
 } else if (typeof define == "function" && define.amd) {
-  define([], function(){ return require("dropzone"); });
+  define("Dropzone", [], function(){ return require("dropzone"); });
 } else {
-  this["Dropzone"] = require("dropzone");
+  (this || window)["Dropzone"] = require("dropzone");
 }
 })()

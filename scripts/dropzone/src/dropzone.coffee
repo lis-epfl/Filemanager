@@ -984,6 +984,33 @@ class Dropzone extends Em
   uploadFile: (file) -> @uploadFiles [ file ]
 
   uploadFiles: (files) ->
+    formData = {}
+    @emit "sending", file, reader, formData for file in files
+
+    for file in files
+      reader = new FileReader()
+      reader.addEventListener "progress", (e) =>
+        progress = 100 * e.loaded / e.total
+        file.upload =
+          progress: progress
+          total: e.total
+          bytesSent: e.loaded
+        @emit "uploadprogress", file, progress, file.upload.bytesSent
+      reader.addEventListener "load", (e) =>
+        filename = formData.currentpath + file.name
+        dataArray = new Uint8Array(reader.result);
+        FS.writeFile(filename, dataArray, { encoding : "binary" })
+        file.upload.done = true
+        allDone = true
+        for f in files
+          allDone = false unless f.upload.done
+        if allDone
+          Connector.sync () =>
+              console.log "upload done"
+              @_finished files, {Error : "No Error", Code : 0, Path : formData.currentpath, Name : file.name}, e
+
+      reader.readAsArrayBuffer file
+    return
     xhr = new XMLHttpRequest()
 
     # Put the xhr object in the file objects to be able to reference it later.
