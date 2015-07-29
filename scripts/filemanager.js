@@ -23,10 +23,42 @@ $(window).load(function() {
 });
 
 Connector.download = function(path) {
+	path = path.replace(/\/+$/, "");
 	console.log("Downloading " + path);
-	var file = FS.readFile(path);
-	var blob = new Blob([file], {type : "application/octet-stream"});
-	saveAs(blob, path.split("/").pop());
+	var info = FS.stat(path);
+	console.log("We have information");
+	var isDir = FS.isDir(info.mode);
+	if (isDir) {
+		console.log("We are saving a directory");
+		var zip = new JSZip();
+		var appendFile = function(zip, path) {
+			console.log("Appending " + path);
+			var name = path.split("/").pop();
+			var info = FS.stat(path);
+			var isDir = FS.isDir(info.mode);
+			if (isDir) {
+				zip = zip.folder(name);
+				var dirContent = FS.readdir(path);
+				for (var i in dirContent) {
+					var innerName = dirContent[i];
+					if (innerName != "." && innerName != "..") {
+						var innerPath = path + "/" + innerName;
+						appendFile(zip, innerPath);
+					}
+				}
+			} else {
+				var file = FS.readFile(path);
+				zip.file(name, file, { binary : true});
+			}
+		}
+		appendFile(zip, path);
+		var blob = zip.generate({type : "blob"});
+		saveAs(blob, path.split("/").pop() + ".zip");
+	} else {
+		var file = FS.readFile(path);
+		var blob = new Blob([file], {type : "application/octet-stream"});
+		saveAs(blob, path.split("/").pop());
+	}
 }
 
 Connector.editfile = function(params, callback) {
