@@ -11,6 +11,7 @@ var Connector = {
 };
 
 $(window).load(function() {
+	top.window.FS = FS;
 	FS.mkdir("/localStorage");
 	FS.mount(IDBFS, {}, "/localStorage");
 	FS.syncfs(true, function(error) {
@@ -1861,6 +1862,22 @@ function init() {
 			$('#fileinfo').data('view', currentViewMode);
 			$('#filetree ul.jqueryFileTree > li.expanded > a').trigger('click');
 			getFolderInfo(fileRoot);
+		});
+
+		$('#start-simulation').click(function() {
+			var cpath = $('#uploader h1').attr('data-path'); // get path
+			if (top.RobogenJS) {
+				top.RobogenJS.sendEvent("filemanager.newSimuation", cpath);
+			}
+			return false;
+		});
+
+		$('#start-evolution').click(function() {
+			var cpath = $('#uploader h1').attr('data-path'); // get path
+			if (top.RobogenJS) {
+				top.RobogenJS.sendEvent("filemanager.newEvolution", cpath);
+			}
+			return false;
 		});
 
 		$('#level-up').click(function() {

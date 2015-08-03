@@ -473,6 +473,14 @@ div.clip {
 #replace span, .contextMenu li.replace a { background-image: url(../images/replace.png); }
 #delete span, .contextMenu li.delete a { background-image: url(../images/bin_closed.png); }
 #upload span { background-image: url(../images/upload.png); }
+#start-evolution span { 
+	background-image: url(../images/evolution.png); 
+	background-size : 16px 16px;
+}
+#start-simulation span { 
+	background-image: url(../images/gears.png); 
+	background-size : 16px 16px;
+}
 #upload span.loading { background-image: url(../images/ajax-loader.gif);color:#555555;font-size:0.9em; }
 #parentfolder span { background-image: url(../images/parentfolder.png); }
 #newfolder span { background-image: url(../images/folder_add.png); }
