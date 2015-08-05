@@ -28,7 +28,7 @@
         "allowFolderDownload": true,
         "allowChangeExtensions": false,
         "allowNoExtension": false,
-        "uploadPolicy": "DISALLOW_ALL",
+        "uploadPolicy": "ALLOW_ALL",
         "uploadRestrictions": [
             "jpg",
             "jpe",
