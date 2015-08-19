@@ -126,7 +126,7 @@
         ]
     },
     "customScrollbar": {
-    	"enabled": true,
+    	"enabled": false,
     	"theme": "inset-2-dark",
     	"button": true
     },
