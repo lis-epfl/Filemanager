@@ -13,7 +13,6 @@ var Connector = {
 top.RobogenJS.sendEvent("filemanager.downloadExamples", function() {
   FS = window.top.FS;
   init();
-  debugger;
 });
 
 Connector.download = function(path) {
