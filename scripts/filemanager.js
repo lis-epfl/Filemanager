@@ -10,17 +10,10 @@ function getJsonFromUrl(query) {
 var Connector = {
 };
 
-$(window).load(function() {
-	top.window.FS = FS;
-	FS.mkdir("/localStorage");
-	FS.mount(IDBFS, {}, "/localStorage");
-	FS.syncfs(true, function(error) {
-		if(error) {
-			throw error;
-		} else {
-			init();
-		}
-	});
+top.RobogenJS.sendEvent("filemanager.downloadExamples", function() {
+  FS = window.top.FS;
+  init();
+  debugger;
 });
 
 Connector.download = function(path) {
@@ -1248,6 +1241,8 @@ function init() {
 	// Adds a new node as the first item beneath the specified
 	// parent node. Called after a successful file upload.
 	var addNode = function(path, name) {
+		console.log("path", path);
+		console.log("name", name);
 		var ext = getExtension(name);
 		var thisNode = $('#filetree').find('a[data-path="' + path + '"]');
 		var parentNode = thisNode.parent();
@@ -1328,6 +1323,9 @@ function init() {
 	// specified parent node. Called after a new folder is
 	// successfully created.
 	var addFolder = function(parent, name) {
+		console.log("parent", parent);
+		console.log("name", name);
+
 		var newNode = '<li class="directory collapsed"><a data-path="' + parent + name + '/" href="#">' + name + '</a><ul class="jqueryFileTree" style="display: block;"></ul></li>';
 		var parentNode = $('#filetree').find('a[data-path="' + parent + '"]');
 		if(parent != fileRoot){
@@ -1867,10 +1865,11 @@ function init() {
 		$('#start-simulation').click(function() {
 			var cpath = $('#uploader h1').attr('data-path'); // get path
 			if (top.RobogenJS) {
-				top.RobogenJS.sendEvent("filemanager.newSimuation", cpath);
+				top.RobogenJS.sendEvent("filemanager.newSimulation", cpath);
 			}
 			return false;
 		});
+
 
 		$('#start-evolution').click(function() {
 			var cpath = $('#uploader h1').attr('data-path'); // get path
