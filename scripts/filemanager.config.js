@@ -122,7 +122,10 @@
         "theme": "elegant",
         "editExt": [
             "txt",
-            "csv"
+            "csv",
+            "js",
+	    "h"
+	    
         ]
     },
     "customScrollbar": {
