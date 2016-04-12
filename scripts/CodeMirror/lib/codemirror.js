@@ -4247,7 +4247,7 @@
   }, true);
 
   option("indentUnit", 2, loadMode, true);
-  option("indentWithTabs", false);
+  option("indentWithTabs", true);
   option("smartIndent", true);
   option("tabSize", 4, function(cm) {
     resetModeState(cm);
