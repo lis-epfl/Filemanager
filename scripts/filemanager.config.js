@@ -124,8 +124,7 @@
             "txt",
             "csv",
             "js",
-	    "h"
-	    
+	    	"h"
         ]
     },
     "customScrollbar": {
