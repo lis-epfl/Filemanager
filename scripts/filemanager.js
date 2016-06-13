@@ -12,7 +12,7 @@ var Connector = {
 
 top.RobogenJS.sendEvent("filemanager.downloadExamples", function() {
   FS = window.top.FS;
-  init();
+  FS.syncfs(true, init);
 });
 
 Connector.download = function(path) {
