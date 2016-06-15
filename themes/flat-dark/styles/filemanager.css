@@ -477,6 +477,10 @@ div.clip {
 	background-image: url(../images/evolution.png); 
 	background-size : 16px 16px;
 }
+#refresh span { 
+	background-image: url(../images/refresh.png); 
+	background-size : 16px 16px;
+}
 #start-simulation span { 
 	background-image: url(../images/gears.png); 
 	background-size : 16px 16px;
